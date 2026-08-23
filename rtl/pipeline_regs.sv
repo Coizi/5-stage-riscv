@@ -46,6 +46,13 @@ package pipeline_pkg;
         SRCB_FOUR  = 2'b10    // constant 4 (JAL/JALR link address)
     } alu_srcb_t;
 
+    // Forwarding select, produced by forward_unit and consumed in execute
+    typedef enum logic [1:0] {
+        FWD_NONE = 2'b00,   // use the value read from the register file in ID
+        FWD_EX   = 2'b01,   // forward the ALU result sitting in EX/MEM
+        FWD_WB   = 2'b10    // forward the writeback value sitting in MEM/WB
+    } fwd_sel_t;
+
     // -------------------------------------------------------------------------
     // IF/ID pipeline register
     // Carries the raw fetched instruction and the PC of that instruction.
@@ -73,6 +80,7 @@ package pipeline_pkg;
         logic       mem_to_reg;   // 1 = writeback from memory, 0 = from ALU
         logic       branch;       // this is a branch instruction
         logic       jump;         // JAL or JALR
+        logic       jalr;         // 1 = JALR (target base is rs1, not PC)
         // ---- data ----
         logic [31:0] pc;          // needed for branch/AUIPC target calc
         logic [31:0] rs1_data;    // register file read port 1
@@ -116,7 +124,13 @@ package pipeline_pkg;
         logic       mem_to_reg;
         // ---- data ----
         logic [31:0] alu_result;  // pass-through for ALU/jump ops
-        logic [31:0] mem_rdata;   // data read from DMEM (load result)
+        logic [31:0] mem_rdata;   // RAW 32-bit word out of DMEM, not yet extended
+        // ---- load formatting ----
+        // The DMEM read is synchronous, so the data only exists once it has
+        // crossed into this register -- which means byte/half lane select and
+        // sign extension have to happen in WB, and WB needs these to do it.
+        logic [2:0]  mem_funct3;  // load width + signedness
+        logic [1:0]  addr_lsb;    // alu_result[1:0]: which lane inside the word
         // ---- destination ----
         logic [4:0]  rd_addr;
         logic        valid;

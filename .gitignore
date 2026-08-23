@@ -1,0 +1,16 @@
+# Vivado simulator build artifacts
+sim/xsim.dir/
+sim/*.log
+sim/*.pb
+sim/*.jou
+sim/*.wdb
+webtalk*.log
+webtalk*.jou
+
+# Vivado project output
+*.cache/
+*.hw/
+*.ip_user_files/
+*.runs/
+*.sim/
+*.str
