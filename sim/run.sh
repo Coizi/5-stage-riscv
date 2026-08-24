@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
-# Compile, elaborate and run the testbench under Vivado's xsim.
-# Usage:  ./run.sh          (from the sim/ directory)
+# Compile, elaborate and run every testbench under Vivado's xsim.
+#
+#   ./run.sh          run all testbenches
+#   ./run.sh alu      run one (alu | regfile | decode | execute |
+#                              forward_unit | hazard_unit | top)
 set -e
 
 VIVADO_BIN="${VIVADO_BIN:-/c/Xilinx/2025.1/Vivado/bin}"
@@ -17,11 +20,38 @@ RTL="../rtl/pipeline_regs.sv \
      ../rtl/hazard_unit.sv \
      ../rtl/top.sv"
 
-echo "=== analyze ==="
-"$VIVADO_BIN/xvlog.bat" -sv $RTL tb_top.sv
+ALL_TB="alu regfile forward_unit hazard_unit decode execute top"
+TBS="${1:-$ALL_TB}"
 
-echo "=== elaborate ==="
-"$VIVADO_BIN/xelab.bat" -debug typical -timescale 1ns/1ps work.tb_top -s tb_sim
+pass=0
+fail=0
 
-echo "=== run ==="
-"$VIVADO_BIN/xsim.bat" tb_sim -runall
+for tb in $TBS; do
+    echo ""
+    echo "############################################################"
+    echo "#  tb_$tb"
+    echo "############################################################"
+
+    "$VIVADO_BIN/xvlog.bat" -sv $RTL "tb_$tb.sv" > /dev/null
+    "$VIVADO_BIN/xelab.bat" -timescale 1ns/1ps "work.tb_$tb" -s "${tb}_sim" > /dev/null
+
+    out=$("$VIVADO_BIN/xsim.bat" "${tb}_sim" -runall)
+    echo "$out" | grep -E "FAIL|PASSED|pass |coverage|hits|========|====" || true
+
+    if echo "$out" | grep -q "FAIL"; then
+        fail=$((fail + 1))
+    else
+        pass=$((pass + 1))
+    fi
+done
+
+echo ""
+echo "############################################################"
+if [ "$fail" -eq 0 ]; then
+    echo "#  ALL $pass TESTBENCHES PASSED"
+else
+    echo "#  $fail of $((pass + fail)) TESTBENCHES FAILED"
+fi
+echo "############################################################"
+
+exit $fail
